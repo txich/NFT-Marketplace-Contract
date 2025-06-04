@@ -1,13 +1,8 @@
-# Sample Hardhat Project
+# NFT MARKETPLACE SMART CONTRACT
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+## Functions:
+- Create listing
+- Cancel listing
+- NFT purchase
 
-Try running some of the following tasks:
-
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.ts
-```
+The NFT transfer will be implemented using getApproved method.
