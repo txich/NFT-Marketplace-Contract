@@ -2,8 +2,10 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract Marketplace {
+
+contract Marketplace is ReentrancyGuard {
 
     uint fee = 5;
     address owner;
@@ -49,6 +51,11 @@ contract Marketplace {
         uint price,
         uint time
     );
+
+    modifier onlyOwner {
+        require (msg.sender == owner, "Not the marketplace owner.");
+        _; 
+    }
 
     constructor (){
         owner = msg.sender;
@@ -97,7 +104,7 @@ contract Marketplace {
             );
     }
 
-    function buyNft(uint _listingId) public payable  {
+    function buyNft(uint _listingId) public payable nonReentrant {
         require (msg.sender != listings[_listingId].seller);
         require (listings[_listingId].active, "Listing is not active");
         require(listings[_listingId].seller != address(0), "Listing does not exist");
@@ -119,10 +126,13 @@ contract Marketplace {
         listings[_listingId].active = false;
 
         if (msg.value > price) {
-            payable(msg.sender).transfer(msg.value - price);
+            (bool _sent, ) = payable(msg.sender).call{ value: msg.value - price}("");
+            require (_sent, "Refund failed");
+            
         }
 
-        payable(listings[_listingId].seller).transfer((price * 100-fee)/100);
+        (bool sent, ) = payable(listings[_listingId].seller).call{value: ((price * 100-fee)/100)}("");
+        require(sent, "Transfer failed");
         
         emit NftTransaction(
             _listingId,
@@ -133,6 +143,21 @@ contract Marketplace {
             price,
             block.timestamp
             );
+    }
+
+    function changeFee(uint _newFee) public onlyOwner {
+        fee = _newFee;
+    }
+
+    function changeOwner(address _newOwner) public onlyOwner {
+        require(_newOwner != address(0), "New owner is invalid");
+        owner = _newOwner;
+    }
+
+    function withdrawFees(uint _value) public onlyOwner {
+        require(_value != 0,"Amount to withdraw must be greater than zero!");
+        (bool sent, ) = payable(owner).call{ value: _value}("");
+        require(sent, "Transfer failed");
     }
 
 }
