@@ -62,6 +62,8 @@ contract Marketplace is ReentrancyGuard {
     }
 
     function createListing(address _nftContract, uint _nftId, uint _price) public {
+        
+        require(_price > 0, "Price must be greater than 0");
 
         IERC721 nft = IERC721(_nftContract);
         require(nft.ownerOf(_nftId) == msg.sender, "You are not the owner");
@@ -89,41 +91,48 @@ contract Marketplace is ReentrancyGuard {
     }
 
     function cancelListing(uint _listingId) public {
-        require(listings[_listingId].seller == msg.sender, "You are not the seller of this listing");
-        require(listings[_listingId].active, "Listing is not active");
+    
+        Listing storage list = listings[_listingId];
+
+        require(list.seller == msg.sender, "You are not the seller of this listing");
+        require(list.active, "Listing is not active");
         
-        listings[_listingId].active = false;
+
+        list.active = false;
         
         emit ListingCancelled(
             _listingId,
-            listings[_listingId].nftContract,
-            listings[_listingId].nftId,
+            list.nftContract,
+            list.nftId,
             msg.sender,
-            listings[_listingId].price,
+            list.price,
             block.timestamp
             );
     }
 
     function buyNft(uint _listingId) public payable nonReentrant {
-        require (msg.sender != listings[_listingId].seller);
-        require (listings[_listingId].active, "Listing is not active");
-        require(listings[_listingId].seller != address(0), "Listing does not exist");
-        uint price = listings[_listingId].price;
 
-        IERC721 nft = IERC721(listings[_listingId].nftContract);
+        Listing storage list = listings[_listingId];
+
+        require (msg.sender != list.seller);
+        require (list.active, "Listing is not active");
+        require(list.seller != address(0), "Listing does not exist");
+        uint price = list.price;
+
+        IERC721 nft = IERC721(list.nftContract);
         require(
-            nft.getApproved(listings[_listingId].nftId) == address(this) 
+            nft.getApproved(list.nftId) == address(this) 
             ||
-            nft.isApprovedForAll(listings[_listingId].seller, address(this)),
+            nft.isApprovedForAll(list.seller, address(this)),
             "Marketplace not approved to transfer this NFT"
         );
 
 
         require (msg.value >= price, "Not enough ETH sent!");
     
-        IERC721(listings[_listingId].nftContract).safeTransferFrom(listings[_listingId].seller, msg.sender, listings[_listingId].nftId);
+        IERC721(list.nftContract).safeTransferFrom(list.seller, msg.sender, list.nftId);
 
-        listings[_listingId].active = false;
+        list.active = false;
 
         if (msg.value > price) {
             (bool _sent, ) = payable(msg.sender).call{ value: msg.value - price}("");
@@ -131,14 +140,14 @@ contract Marketplace is ReentrancyGuard {
             
         }
 
-        (bool sent, ) = payable(listings[_listingId].seller).call{value: ((price * 100-fee)/100)}("");
+        (bool sent, ) = payable(list.seller).call{value: ((price * 100-fee)/100)}("");
         require(sent, "Transfer failed");
         
         emit NftTransaction(
             _listingId,
-            listings[_listingId].nftContract,
-            listings[_listingId].nftId,
-            listings[_listingId].seller,
+            list.nftContract,
+            list.nftId,
+            list.seller,
             msg.sender,
             price,
             block.timestamp
