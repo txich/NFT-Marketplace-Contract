@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 contract Marketplace is ReentrancyGuard {
 
     uint fee = 5;
-    address owner;
+    address public owner;
     uint public listingsNumber;
 
     mapping (uint => Listing) public listings;
