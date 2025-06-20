@@ -2,6 +2,7 @@
 
 ### Deploy-ready version 
 ### (WAS NOT TESTED USING HARDHAT, DO NOT DEPLOY IN MAINNET, WAIT FOR FUTURE VERSIONS)
+### The tests are currently under development.
 
 ## Functions:
 - Create listing
