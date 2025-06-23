@@ -4,6 +4,7 @@ import { expect } from "chai";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { Marketplace, NFTC } from "../typechain-types";
 import { Signer } from "ethers";
+import { any } from "hardhat/internal/core/params/argumentTypes";
 
 
 describe("NFTMarketplace", function () {
@@ -62,6 +63,71 @@ describe("NFTMarketplace", function () {
         expect(listing.seller).to.equal(nftseller.address);
         expect(listing.price).to.equal(price);
         expect(listing.active).to.equal(true);
+    });
+
+    it("Should buy NFT from the marketplace", async function () {
+        const { marketplace, nftc, nftseller, nftbuyer } = await loadFixture(deploy);
+
+        await nftc.connect(nftseller).mint(nftseller.address, 2);
+        await nftc.connect(nftseller).approve(marketplace.target, 2);
+
+        const price = ethers.parseEther("1");
+
+        await marketplace.connect(nftseller).createListing(nftc.target, 2, price);
+
+        await expect(
+            marketplace.connect(nftbuyer).buyNft(1, { value: price })
+        ).to.emit(marketplace, "NftTransaction").withArgs(
+            1,
+            nftc.target,
+            2,
+            nftseller.address,
+            nftbuyer.address,
+            price,
+            anyValue
+        );
+
+        expect(await nftc.ownerOf(2)).to.equal(nftbuyer.address);
+    });
+
+    it("Shouldn't allow buying an NFT with insufficient funds", async function () {
+        const { marketplace, nftc, nftseller, nftbuyer } = await loadFixture(deploy);
+
+        await nftc.connect(nftseller).mint(nftseller.address, 3);
+        await nftc.connect(nftseller).approve(marketplace.target, 3);
+
+        const price = ethers.parseEther("1");
+
+        await marketplace.connect(nftseller).createListing(nftc.target, 3, price);
+
+        await expect(
+            marketplace.connect(nftbuyer).buyNft(1, { value: ethers.parseEther("0.5") })
+        ).to.be.revertedWith("Not enough ETH sent!");
+    });
+
+    it("Should cancel a listing", async function () {
+        const { marketplace, nftc, nftseller } = await loadFixture(deploy);
+
+        await nftc.connect(nftseller).mint(nftseller.address, 4);
+        await nftc.connect(nftseller).approve(marketplace.target, 4);
+
+        const price = ethers.parseEther("1");
+
+        await marketplace.connect(nftseller).createListing(nftc.target, 4, price);
+
+        await expect(
+            marketplace.connect(nftseller).cancelListing(1)
+        ).to.emit(marketplace, "ListingCancelled").withArgs(
+            1,
+            nftc.target,
+            4,
+            nftseller.address,
+            price,
+            anyValue
+        );
+
+        const listing = await marketplace.listings(1);
+        expect(listing.active).to.equal(false);
     });
 
 

@@ -3,12 +3,12 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 
-contract Marketplace is ReentrancyGuard {
+contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
 
     uint fee = 5;
-    address public owner;
     uint public listingsNumber;
 
     mapping (uint => Listing) public listings;
@@ -51,15 +51,6 @@ contract Marketplace is ReentrancyGuard {
         uint price,
         uint time
     );
-
-    modifier onlyOwner {
-        require (msg.sender == owner, "Not the marketplace owner.");
-        _; 
-    }
-
-    constructor (){
-        owner = msg.sender;
-    }
 
     function createListing(address _nftContract, uint _nftId, uint _price) public {
         
@@ -158,14 +149,10 @@ contract Marketplace is ReentrancyGuard {
         fee = _newFee;
     }
 
-    function changeOwner(address _newOwner) public onlyOwner {
-        require(_newOwner != address(0), "New owner is invalid");
-        owner = _newOwner;
-    }
 
     function withdrawFees(uint _value) public onlyOwner {
         require(_value != 0,"Amount to withdraw must be greater than zero!");
-        (bool sent, ) = payable(owner).call{ value: _value}("");
+        (bool sent, ) = payable(msg.sender).call{ value: _value}("");
         require(sent, "Transfer failed");
     }
 
