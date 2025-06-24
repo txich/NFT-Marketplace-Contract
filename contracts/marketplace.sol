@@ -12,6 +12,7 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
     uint public listingsNumber;
 
     mapping (uint => Listing) public listings;
+    mapping (address => mapping(uint => bool)) public nftListed; // nftContract => (nftId => isListed)
 
     struct Listing {
         uint id;
@@ -55,7 +56,7 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
     function createListing(address _nftContract, uint _nftId, uint _price) public {
         
         require(_price > 0, "Price must be greater than 0");
-
+        require(nftListed[_nftContract][_nftId] == false, "NFT already listed");
         IERC721 nft = IERC721(_nftContract);
         require(nft.ownerOf(_nftId) == msg.sender, "You are not the owner");
 
@@ -67,6 +68,7 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
         );
 
         listingsNumber++;
+        nftListed[_nftContract][_nftId] = true;
         
         listings[listingsNumber] = Listing({
             id: listingsNumber,
@@ -90,6 +92,7 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
         
 
         list.active = false;
+        nftListed[list.nftContract][list.nftId] = false;
         
         emit ListingCancelled(
             _listingId,
@@ -124,6 +127,7 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
         IERC721(list.nftContract).safeTransferFrom(list.seller, msg.sender, list.nftId);
 
         list.active = false;
+        nftListed[list.nftContract][list.nftId] = false;
 
         if (msg.value > price) {
             (bool _sent, ) = payable(msg.sender).call{ value: msg.value - price}("");
