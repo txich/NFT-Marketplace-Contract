@@ -173,6 +173,38 @@ describe("NFTMarketplace", function () {
             ).to.be.revertedWith("Not enough ETH sent!");
         });
 
+        it("Should refund excess ETH after buying an NFT", async function () {
+
+            const { marketplace, nftc, nftseller, nftbuyer } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 4);
+            await nftc.connect(nftseller).approve(marketplace.target, 4);
+            
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 4, price);
+
+            const initialBalance = await ethers.provider.getBalance(nftbuyer);
+
+            const tx = await marketplace.connect(nftbuyer).buyNft(1, { value: ethers.parseEther("2") });
+
+            await expect(tx)
+            .to.emit(marketplace, "NftTransaction").withArgs(
+                1,
+                nftc.target,
+                4,
+                nftseller.address,
+                nftbuyer.address,
+                price,
+                anyValue
+            );
+
+            await tx.wait();
+            const finalBalance = await ethers.provider.getBalance(nftbuyer);
+
+            await expect(tx).to.changeEtherBalance(nftbuyer, -price);
+        });
+
         it("Shouldn't allow buying an NFT that is not listed", async function () {
             const { marketplace, nftc, nftseller, nftbuyer } = await loadFixture(deploy);
 
@@ -260,30 +292,115 @@ describe("NFTMarketplace", function () {
 
     });
 
-    it("Should cancel a listing", async function () {
-        const { marketplace, nftc, nftseller } = await loadFixture(deploy);
+    describe("NFT Listing Cancellation", function () {
 
-        await nftc.connect(nftseller).mint(nftseller.address, 4);
-        await nftc.connect(nftseller).approve(marketplace.target, 4);
+        it("Should cancel a listing", async function () {
+            const { marketplace, nftc, nftseller } = await loadFixture(deploy);
 
-        const price = ethers.parseEther("1");
+            await nftc.connect(nftseller).mint(nftseller.address, 4);
+            await nftc.connect(nftseller).approve(marketplace.target, 4);
 
-        await marketplace.connect(nftseller).createListing(nftc.target, 4, price);
+            const price = ethers.parseEther("1");
 
-        await expect(
-            marketplace.connect(nftseller).cancelListing(1)
-        ).to.emit(marketplace, "ListingCancelled").withArgs(
-            1,
-            nftc.target,
-            4,
-            nftseller.address,
-            price,
-            anyValue
-        );
+            await marketplace.connect(nftseller).createListing(nftc.target, 4, price);
 
-        const listing = await marketplace.listings(1);
-        expect(listing.active).to.equal(false);
+            await expect(
+                marketplace.connect(nftseller).cancelListing(1)
+            ).to.emit(marketplace, "ListingCancelled").withArgs(
+                1,
+                nftc.target,
+                4,
+                nftseller.address,
+                price,
+                anyValue
+            );
+
+            const listing = await marketplace.listings(1);
+            expect(listing.active).to.equal(false);
+        });
+
+        it("Shouldn't allow cancelling a listing that is not active", async function () {
+            const { marketplace, nftc, nftseller } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 5);
+            await nftc.connect(nftseller).approve(marketplace.target, 5);
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 5, price);
+            await marketplace.connect(nftseller).cancelListing(1);
+
+            // Attempt to cancel an already cancelled listing
+            await expect(
+                marketplace.connect(nftseller).cancelListing(1)
+            ).to.be.revertedWith("Listing is not active");
+        });
+
+        it("Shouldn't allow cancelling a listing by someone other than the seller", async function () {
+            const { marketplace, nftc, nftseller, randwallet } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 6);
+            await nftc.connect(nftseller).approve(marketplace.target, 6);
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 6, price);
+
+            // Attempt to cancel a listing by another address
+            await expect(
+                marketplace.connect(randwallet).cancelListing(1)
+            ).to.be.revertedWith("You are not the seller of this listing");
+        });
+
+        it("Shouldn't allow cancelling a listing that does not exist", async function () {
+            const { marketplace, nftc, nftseller } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 7);
+            await nftc.connect(nftseller).approve(marketplace.target, 7);
+
+            // Attempt to cancel a non-existent listing
+            await expect(
+                marketplace.connect(nftseller).cancelListing(999)
+            ).to.be.revertedWith("Listing is not active");
+        });
+
     });
+
+    describe("Owner Functions", function () { 
+
+        it("Should allow the owner to withdraw funds", async function () {
+            const { marketplace, nftc, nftseller, nftbuyer, markowner } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 8);
+            await nftc.connect(nftseller).approve(marketplace.target, 8);
+
+            const price = ethers.parseEther("100");
+
+            const initialBalance = await ethers.provider.getBalance(markowner.address);
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 8, price);
+            await marketplace.connect(nftbuyer).buyNft(1, { value: price });
+
+    
+            const tx = await marketplace.connect(markowner).withdrawFees(ethers.parseEther("1"));
+
+            expect(tx).to.emit(marketplace, "Withdrawn").withArgs(
+                markowner.address,
+                ethers.parseEther("1"),
+                anyValue
+            );
+
+            await tx.wait();
+
+            expect(await ethers.provider.getBalance(markowner.address)).to.be.equal(initialBalance + ethers.parseEther("1"));
+            
+        });
+
+
+    
+
+    });
+
 
 
 });

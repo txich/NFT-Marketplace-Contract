@@ -53,6 +53,18 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
         uint time
     );
 
+    event FeeChanged (
+        uint oldFee,
+        uint newFee,
+        uint time
+    );
+
+    event Withdraw (
+        address owner,
+        uint value,
+        uint time
+    );
+
     function createListing(address _nftContract, uint _nftId, uint _price) public {
         
         require(_price > 0, "Price must be greater than 0");
@@ -87,8 +99,9 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
     
         Listing storage list = listings[_listingId];
 
-        require(list.seller == msg.sender, "You are not the seller of this listing");
         require(list.active, "Listing is not active");
+        require(list.seller == msg.sender, "You are not the seller of this listing");
+        
         
 
         list.active = false;
@@ -151,14 +164,29 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
     }
 
     function changeFee(uint _newFee) public onlyOwner {
+
+        require(_newFee >= 0 && _newFee <= 50, "Fee must be between 0 and 50");
+        
+        emit FeeChanged(
+            fee,
+            _newFee,
+            block.timestamp
+        );
+
         fee = _newFee;
+
     }
 
 
     function withdrawFees(uint _value) public onlyOwner {
+
+        require(address(this).balance >= _value, "Not enough balance to withdraw");
         require(_value != 0,"Amount to withdraw must be greater than zero!");
+        
         (bool sent, ) = payable(msg.sender).call{ value: _value}("");
         require(sent, "Transfer failed");
+
+        emit Withdraw(msg.sender, _value, block.timestamp);
     }
 
 }
