@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
 
-    uint fee = 5;
+    uint public fee = 5;
     uint public listingsNumber;
 
     mapping (uint => Listing) public listings;
@@ -165,7 +165,7 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
 
     function changeFee(uint _newFee) public onlyOwner {
 
-        require(_newFee >= 0 && _newFee <= 50, "Fee must be between 0 and 50");
+        require(_newFee <= 50, "Fee must be between 0 and 50");
         
         emit FeeChanged(
             fee,

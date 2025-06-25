@@ -72,6 +72,35 @@ describe("NFTMarketplace", function () {
             expect(listing.active).to.equal(true);
         });
 
+
+        it("Should mint NFT and list it on the marketplace (setApprovalForAll)", async function () {
+            const { marketplace, nftc, nftseller } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 1);
+            expect(await nftc.ownerOf(1)).to.equal(nftseller.address);
+            await nftc.connect(nftseller).setApprovalForAll(marketplace.target, true);
+
+            const price = ethers.parseEther("1");
+
+            await expect(
+                marketplace.connect(nftseller).createListing(nftc.target, 1, price)
+            ).to.emit(marketplace, "NewListing").withArgs(
+                1, 
+                nftc.target,
+                1,
+                nftseller.address,
+                price,
+                anyValue
+            );
+            
+            const listing = await marketplace.listings(1);
+            expect(listing.nftContract).to.equal(nftc.target);
+            expect(listing.nftId).to.equal(1);
+            expect(listing.seller).to.equal(nftseller.address);
+            expect(listing.price).to.equal(price);
+            expect(listing.active).to.equal(true);
+        });
+
         it("Shouldn't allow listing an NFT that is not owned", async function () {
             const { marketplace, nftc, nftseller, randwallet } = await loadFixture(deploy);
 
@@ -382,9 +411,6 @@ describe("NFTMarketplace", function () {
             const tx0 = await marketplace.connect(nftbuyer).buyNft(1, { value: price });
 
             await tx0.wait();
-
-            console.log(await ethers.provider.getBalance(marketplace.target));
-
     
             const tx = await marketplace.connect(markowner).withdrawFees(ethers.parseEther("1"));
 
@@ -399,6 +425,95 @@ describe("NFTMarketplace", function () {
             await expect(tx).to.changeEtherBalance(markowner, ethers.parseEther("1"));
             
         });
+
+        it("Shouldn't allow non-owners to withdraw funds", async function () {
+            const { marketplace, nftc, nftseller, nftbuyer, randwallet } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 9);
+            await nftc.connect(nftseller).approve(marketplace.target, 9);
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 9, price);
+            await marketplace.connect(nftbuyer).buyNft(1, { value: price });
+
+            // Attempt to withdraw funds as a non-owner
+            await expect(
+                marketplace.connect(randwallet).withdrawFees(ethers.parseEther("1"))
+            ).to.be.revertedWithCustomError;
+        });
+
+
+        it("Shouldn't allow withdrawing more than available funds", async function () {
+            const { marketplace, nftc, nftseller, nftbuyer, markowner } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 10);
+            await nftc.connect(nftseller).approve(marketplace.target, 10);
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 10, price);
+            await marketplace.connect(nftbuyer).buyNft(1, { value: price });
+
+            // Attempt to withdraw more than available funds
+            await expect(
+                marketplace.connect(markowner).withdrawFees(ethers.parseEther("2"))
+            ).to.be.revertedWith("Not enough balance to withdraw");
+        });
+
+
+        it("Shouldn't allow withdrawing zero funds", async function () {
+            const { marketplace, markowner } = await loadFixture(deploy);
+
+            // Attempt to withdraw zero funds
+            await expect(
+                marketplace.connect(markowner).withdrawFees(0)
+            ).to.be.revertedWith("Amount to withdraw must be greater than zero!");
+        });
+
+
+        it("Should allow the owner to change the fee percentage", async function () {
+            const { marketplace, markowner } = await loadFixture(deploy);
+
+            const initialFeePercentage = await marketplace.fee();
+            const newFeePercentage = 10;
+
+            await expect(
+                marketplace.connect(markowner).changeFee(newFeePercentage)
+            ).to.emit(marketplace, "FeeChanged").withArgs(
+                initialFeePercentage,
+                newFeePercentage,
+                anyValue
+            );
+
+            await expect(await marketplace.fee()).to.equal(newFeePercentage);
+
+        });
+
+
+        it("Shouldn't allow non-owners to change the fee percentage", async function () {
+            const { marketplace, randwallet } = await loadFixture(deploy);
+
+            const newFeePercentage = 10;
+
+            // Attempt to change the fee percentage as a non-owner
+            await expect(
+                marketplace.connect(randwallet).changeFee(newFeePercentage)
+            ).to.be.revertedWithCustomError;
+        });
+
+        
+        it("Shouldn't allow setting a fee percentage >50", async function () {
+            const { marketplace, markowner } = await loadFixture(deploy);
+
+            const newFeePercentage = 51;
+
+            // Attempt to set a fee percentage greater than 50
+            await expect(
+                marketplace.connect(markowner).changeFee(newFeePercentage)
+            ).to.be.revertedWith("Fee must be between 0 and 50");
+        });
+
 
 
     
