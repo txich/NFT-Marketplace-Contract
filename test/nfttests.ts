@@ -185,6 +185,79 @@ describe("NFTMarketplace", function () {
             ).to.be.revertedWith("Listing is not active");
         });
 
+        it ("Shouldn't allow buying an NFT that has been cancelled", async function () {
+            const { marketplace, nftc, nftseller, nftbuyer } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 5);
+            await nftc.connect(nftseller).approve(marketplace.target, 5);
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 5, price);
+            await marketplace.connect(nftseller).cancelListing(1);
+
+            // Attempt to buy a cancelled NFT
+            await expect(
+                marketplace.connect(nftbuyer).buyNft(1, { value: price })
+            ).to.be.revertedWith("Listing is not active");
+        });
+
+
+        it("Shouldn't allow buying your own NFT", async function () {
+            const { marketplace, nftc, nftseller } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 5);
+            await nftc.connect(nftseller).approve(marketplace.target, 5);
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 5, price);
+
+            // Attempt to buy your own NFT
+            await expect(
+                marketplace.connect(nftseller).buyNft(1, { value: price })
+            ).to.be.revertedWith("You cannot buy your own NFT");
+        });
+
+        it("Shouldn't sell an NFT that is not owned by the seller", async function () {
+            const { marketplace, nftc, nftseller, randwallet, nftbuyer } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 6);
+            await nftc.connect(nftseller).approve(marketplace.target, 6);
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 6, price);
+            await nftc.connect(nftseller).transferFrom(nftseller.address, randwallet.address, 6);
+
+            await nftc.connect(randwallet).approve(marketplace.target, 6);
+
+        
+            // Attempt to buy an NFT that is not owned by the seller
+            await expect(
+                marketplace.connect(nftbuyer).buyNft(1, { value: price })
+            ).to.be.revertedWith("Ownership error");
+        });
+
+        it("Shouldn't allow buying an NFT that is not approved for sale", async function () {
+            const { marketplace, nftc, nftseller, nftbuyer } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 7);
+            await nftc.connect(nftseller).approve(marketplace.target, 7);
+            // Not approving the marketplace for this NFT
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 7, price);
+
+            await nftc.connect(nftseller).approve(ethers.ZeroAddress,7);
+
+            // Attempt to buy an NFT that is not approved
+            await expect(
+                marketplace.connect(nftbuyer).buyNft(1, { value: price })
+            ).to.be.revertedWith("Marketplace not approved to transfer this NFT");
+        });
+
     });
 
     it("Should cancel a listing", async function () {

@@ -108,9 +108,8 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
 
         Listing storage list = listings[_listingId];
 
-        require (msg.sender != list.seller);
+        require (msg.sender != list.seller, "You cannot buy your own NFT");
         require (list.active, "Listing is not active");
-        require(list.seller != address(0), "Listing does not exist");
         uint price = list.price;
 
         IERC721 nft = IERC721(list.nftContract);
@@ -120,6 +119,8 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
             nft.isApprovedForAll(list.seller, address(this)),
             "Marketplace not approved to transfer this NFT"
         );
+
+        require(nft.ownerOf(list.nftId) == list.seller, "Ownership error");
 
 
         require (msg.value >= price, "Not enough ETH sent!");
