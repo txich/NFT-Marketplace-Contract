@@ -379,7 +379,11 @@ describe("NFTMarketplace", function () {
             const initialBalance = await ethers.provider.getBalance(markowner.address);
 
             await marketplace.connect(nftseller).createListing(nftc.target, 8, price);
-            await marketplace.connect(nftbuyer).buyNft(1, { value: price });
+            const tx0 = await marketplace.connect(nftbuyer).buyNft(1, { value: price });
+
+            await tx0.wait();
+
+            console.log(await ethers.provider.getBalance(marketplace.target));
 
     
             const tx = await marketplace.connect(markowner).withdrawFees(ethers.parseEther("1"));
@@ -392,7 +396,7 @@ describe("NFTMarketplace", function () {
 
             await tx.wait();
 
-            expect(await ethers.provider.getBalance(markowner.address)).to.be.equal(initialBalance + ethers.parseEther("1"));
+            await expect(tx).to.changeEtherBalance(markowner, ethers.parseEther("1"));
             
         });
 

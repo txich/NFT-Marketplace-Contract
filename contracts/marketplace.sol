@@ -149,7 +149,7 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
             
         }
 
-        (bool sent, ) = payable(list.seller).call{value: ((price * 100-fee)/100)}("");
+        (bool sent, ) = payable(list.seller).call{value: ((price * (100-fee))/100)}("");
         require(sent, "Transfer failed");
         
         emit NftTransaction(
@@ -182,7 +182,7 @@ contract Marketplace is ReentrancyGuard, Ownable(msg.sender) {
 
         require(address(this).balance >= _value, "Not enough balance to withdraw");
         require(_value != 0,"Amount to withdraw must be greater than zero!");
-        
+
         (bool sent, ) = payable(msg.sender).call{ value: _value}("");
         require(sent, "Transfer failed");
 
