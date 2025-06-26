@@ -430,6 +430,26 @@ describe("NFTMarketplace", function () {
             ).to.be.revertedWith("Refund failed");
 
         });
+        
+        it("Should revert the tx if the transfer to seller fails", async function () {
+            const { marketplace, nftc, nftseller, nftbuyer, randwallet, reject } = await loadFixture(deploy);
+
+            await nftc.connect(randwallet).mint(randwallet.address, 9);
+            await nftc.connect(randwallet).approve(marketplace.target, 9);
+
+            const price = ethers.parseEther("1");
+
+            await nftc.connect(randwallet).transferFrom(randwallet.address, reject.target, 9);
+
+            await reject.connect(randwallet).callApprovalForAll(nftc.target, marketplace.target, true);
+
+            await reject.connect(randwallet).callCreateListing(marketplace.target, nftc.target, 9, price);
+
+            await expect(
+                marketplace.connect(nftbuyer).buyNft(1, { value: price })
+            ).to.be.revertedWith("Transfer failed");
+
+        });
 
 
     });

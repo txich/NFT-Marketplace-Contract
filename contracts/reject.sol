@@ -5,6 +5,14 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 interface IMarketplace {
     function buyNft(uint listingId) external payable;
+    function createListing(
+        address nftContract,
+        uint nftId,
+        uint price
+    ) external;
+}   
+interface INFTC {
+    function setApprovalForAll(address to, bool approved) external;
 }
 
 contract Reject is IERC721Receiver {
@@ -14,6 +22,24 @@ contract Reject is IERC721Receiver {
 
     function callBuyNft(address marketplace, uint listingId) public payable {
         IMarketplace(marketplace).buyNft{value: msg.value}(listingId);
+    }
+
+    function callCreateListing(
+        address marketplace,
+        address nftContract,
+        uint nftId,
+        uint price
+    ) public {
+        IMarketplace(marketplace).createListing(nftContract, nftId, price);
+    }
+
+    function callApprovalForAll(
+        address nftContract,
+        address to,
+        bool approved
+    ) public {
+        INFTC(nftContract).setApprovalForAll(to, approved);
+     
     }
 
     function onERC721Received(
