@@ -2,9 +2,6 @@ import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
-import { Marketplace, NFTC } from "../typechain-types";
-import { Signer } from "ethers";
-import { any, bigint } from "hardhat/internal/core/params/argumentTypes";
 
 
 describe("NFTMarketplace", function () {
@@ -31,7 +28,8 @@ describe("NFTMarketplace", function () {
             nftdeployer,
             randwallet,
             marketplace,
-            nftc
+            nftc,
+            reject
         }
     }
     
@@ -417,6 +415,23 @@ describe("NFTMarketplace", function () {
             ).to.be.revertedWith("Marketplace not approved to transfer this NFT");
         });
 
+        it("Should revert the transaction if refund fails", async function () {
+            const { marketplace, nftc, nftseller, nftbuyer, randwallet, reject } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 8);
+            await nftc.connect(nftseller).approve(marketplace.target, 8);
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 8, price);
+
+            await expect(
+            reject.connect(randwallet).callBuyNft(marketplace.target, 1, { value: ethers.parseEther("2") })
+            ).to.be.revertedWith("Refund failed");
+
+        });
+
+
     });
 
     describe("NFT Listing Cancellation", function () {
@@ -613,7 +628,6 @@ describe("NFTMarketplace", function () {
         });
 
     });
-
 
 
 });
