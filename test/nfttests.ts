@@ -19,6 +19,11 @@ describe("NFTMarketplace", function () {
         const nftc = await FactoryNft.connect(nftdeployer).deploy();
         await nftc.waitForDeployment();
 
+        const FactoryReject = await ethers.getContractFactory("Reject");
+        const reject = await FactoryReject.connect(randwallet).deploy();
+        await reject.waitForDeployment();
+
+
         return{
             markowner,
             nftseller,
@@ -63,6 +68,10 @@ describe("NFTMarketplace", function () {
                 price,
                 anyValue
             );
+
+            expect(await marketplace.listingsNumber()).to.equal(1);
+            expect(await marketplace.nftListed(nftc.target, 1)).to.equal(true);
+
             
             const listing = await marketplace.listings(1);
             expect(listing.nftContract).to.equal(nftc.target);
@@ -82,16 +91,22 @@ describe("NFTMarketplace", function () {
 
             const price = ethers.parseEther("1");
 
-            await expect(
-                marketplace.connect(nftseller).createListing(nftc.target, 1, price)
-            ).to.emit(marketplace, "NewListing").withArgs(
-                1, 
+            const lis = await marketplace.connect(nftseller).createListing(nftc.target, 1, price)
+
+            await lis.wait();
+
+            await expect(lis).to.emit(marketplace, "NewListing").withArgs(
+                1,
                 nftc.target,
                 1,
                 nftseller.address,
                 price,
                 anyValue
-            );
+            )
+            
+
+            expect(await marketplace.listingsNumber()).to.equal(1);
+            expect(await marketplace.nftListed(nftc.target, 1)).to.equal(true);
             
             const listing = await marketplace.listings(1);
             expect(listing.nftContract).to.equal(nftc.target);
@@ -158,6 +173,32 @@ describe("NFTMarketplace", function () {
         
         });
 
+
+        it ("Should allow listing an NFT that was previously listed and cancelled", async function () {
+            const { marketplace, nftc, nftseller } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 5);
+            await nftc.connect(nftseller).approve(marketplace.target, 5);
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 5, price);
+            await marketplace.connect(nftseller).cancelListing(1);
+
+            // Now re-list the same NFT
+            await expect(
+                marketplace.connect(nftseller).createListing(nftc.target, 5, price)
+            ).to.emit(marketplace, "NewListing").withArgs(
+                2,
+                nftc.target,
+                5,
+                nftseller.address,
+                price,
+                anyValue
+            );
+
+        });
+
     });
 
     describe("NFT Buying", function () {
@@ -185,7 +226,45 @@ describe("NFTMarketplace", function () {
             );
 
             expect(await nftc.ownerOf(2)).to.equal(nftbuyer.address);
+
+            expect(await marketplace.nftListed(nftc.target, 2)).to.equal(false);
+
+            expect((await marketplace.listings(1)).active).to.equal(false);
+
         });
+
+
+        
+        it("Should buy NFT from the marketplace (setApprovalForAll)", async function () {
+            const { marketplace, nftc, nftseller, nftbuyer } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 2);
+            await nftc.connect(nftseller).setApprovalForAll(marketplace.target, true);
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 2, price);
+
+            await expect(
+                marketplace.connect(nftbuyer).buyNft(1, { value: price })
+            ).to.emit(marketplace, "NftTransaction").withArgs(
+                1,
+                nftc.target,
+                2,
+                nftseller.address,
+                nftbuyer.address,
+                price,
+                anyValue
+            );
+
+            expect(await nftc.ownerOf(2)).to.equal(nftbuyer.address);
+            
+            expect(await marketplace.nftListed(nftc.target, 2)).to.equal(false);
+
+            expect((await marketplace.listings(1)).active).to.equal(false);
+
+        });
+
 
         it("Shouldn't allow buying an NFT with insufficient funds", async function () {
             const { marketplace, nftc, nftseller, nftbuyer } = await loadFixture(deploy);
@@ -319,6 +398,25 @@ describe("NFTMarketplace", function () {
             ).to.be.revertedWith("Marketplace not approved to transfer this NFT");
         });
 
+        it("Shouldn't allow buying an NFT that is not approved for sale (setApprovalForAll)", async function () {
+            const { marketplace, nftc, nftseller, nftbuyer } = await loadFixture(deploy);
+
+            await nftc.connect(nftseller).mint(nftseller.address, 7);
+            await nftc.connect(nftseller).setApprovalForAll(marketplace.target, true);
+            // Not approving the marketplace for this NFT
+
+            const price = ethers.parseEther("1");
+
+            await marketplace.connect(nftseller).createListing(nftc.target, 7, price);
+
+            await nftc.connect(nftseller).setApprovalForAll(marketplace.target, false) ;
+
+            // Attempt to buy an NFT that is not approved
+            await expect(
+                marketplace.connect(nftbuyer).buyNft(1, { value: price })
+            ).to.be.revertedWith("Marketplace not approved to transfer this NFT");
+        });
+
     });
 
     describe("NFT Listing Cancellation", function () {
@@ -414,7 +512,7 @@ describe("NFTMarketplace", function () {
     
             const tx = await marketplace.connect(markowner).withdrawFees(ethers.parseEther("1"));
 
-            expect(tx).to.emit(marketplace, "Withdrawn").withArgs(
+            expect(tx).to.emit(marketplace, "Withdraw").withArgs(
                 markowner.address,
                 ethers.parseEther("1"),
                 anyValue
@@ -513,10 +611,6 @@ describe("NFTMarketplace", function () {
                 marketplace.connect(markowner).changeFee(newFeePercentage)
             ).to.be.revertedWith("Fee must be between 0 and 50");
         });
-
-
-
-    
 
     });
 
