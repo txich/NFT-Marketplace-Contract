@@ -1,18 +1,20 @@
 # NFT MARKETPLACE SMART CONTRACT
 
 ### Deploy-ready version 
-### (WAS NOT TESTED USING HARDHAT, DO NOT DEPLOY IN MAINNET, WAIT FOR FUTURE VERSIONS)
-### The tests are currently under development.
+### All functions were tested using HardHat.
 
 ## Functions:
 - Create listing
 - Cancel listing
 - NFT purchase
-- Change owner (owner only)
-- Withdraw from contract (owner only)
-- Change fee (owner only)
+- Change owner (Ownable)
+- Withdraw from contract (Owner only)
+- Change fee (Owner only)
+
+All functions emit an event.
 
 The NFT transfer is implemented using getApproved method.
 Transactions are implemented using call method.
-Added ReentrancyGuard.
+Added ReentrancyGuard & Ownable.
+
 
