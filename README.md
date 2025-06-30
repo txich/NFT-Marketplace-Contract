@@ -41,7 +41,7 @@ npm install
     ```
     Open a new terminal and deploy the Hardhat Ignition module in the localhost network
     ```bash
-    npx hardhat ignition deploy ./ignition/modules/Lock.ts --network localhost
+    npx hardhat ignition deploy ./ignition/modules/Marketplace.ts --network localhost
     ```
 
 ### Running Tests
