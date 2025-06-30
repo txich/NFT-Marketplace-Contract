@@ -33,9 +33,15 @@ npm install
 ### Deployment
 
 1. Configure your network and wallet in the config (e.g., `hardhat.config.ts`).
-2. Deploy the contract:
+2. Deploy the contract following these steps:
+    
+    Start a local node
     ```bash
-    npx hardhat run scripts/deploy.ts --network <network>
+    npx hardhat node
+    ```
+    Open a new terminal and deploy the Hardhat Ignition module in the localhost network
+    ```bash
+    npx hardhat ignition deploy ./ignition/modules/Lock.ts --network localhost
     ```
 
 ### Running Tests
